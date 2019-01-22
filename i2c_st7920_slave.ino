@@ -44,7 +44,6 @@ float mapfloat(float x, float in_min, float in_max, float out_min, float out_max
 
 void draw_idle(){
     u8g.setFont(u8g_font_unifont);
-
     u8g.drawCircle(64, 24, 24);
     float hours = dt.hour + (dt.min/60.0);
     float mins = dt.min;
@@ -97,18 +96,9 @@ void update_station(){
   else if (station_len == 16){
     station_x_pos = 0;
   } else {
-    if(station_x_pos == 0){
-        station_x_pos = -1;        
-    } else if(station_x_pos < 0){
-      if(station_dir == LEFT){
-        station_x_pos -= 1;  
-      } else {
-        station_x_pos += 1;
-      }
-    }
-    if(station_x_pos < (station_len * 8) - 128){
-      station_x_pos += 1;
-      station_dir = RIGHT;
+    station_x_pos = -1;
+    if(station_x_pos < (station_len * 8)){
+      station_x_pos = 0;
     }
   }
 }
@@ -121,18 +111,9 @@ void update_artist(){
   else if (artist_len == 16){
     artist_x_pos = 0;
   } else {
-    if(artist_x_pos == 0){
-        artist_x_pos = -1;        
-    } else if(artist_x_pos < 0){
-      if(artist_dir == LEFT){
-        artist_x_pos -= 1;  
-      } else {
-        artist_x_pos += 1;
-      }
-    }
-    if(artist_x_pos < (artist_len * 8) - 128){
-      artist_x_pos += 1;
-      artist_dir = RIGHT;
+     artist_x_pos = -1;
+    if(artist_x_pos < (artist_len * 8)){
+      artist_x_pos = 0;
     }
   }
 }
@@ -146,32 +127,33 @@ void update_title(){
     title_x_pos = 0;
   } else {
     Serial.println(title_x_pos);
-    if(title_x_pos == 0){
-        title_dir = LEFT;
-        title_x_pos = -1;        
-    } else if(title_x_pos < 0){
-      if(title_dir == LEFT){
-        title_x_pos -= 1;  
-      } else {
-        title_x_pos += 1;
-      }
-    }
-    if(title_x_pos < -((title_len * 8) - 128)){
-      Serial.println("Going back again");
-      title_x_pos += 1;
-      title_dir = RIGHT;
+    title_x_pos -= 1;
+    if(title_x_pos < -((title_len * 8))){
+      title_x_pos = 0;
     }
   }
 }
 
-void draw_playing(){
-  u8g.setFont(u8g_font_unifont);
+void update_radio_text(){
   update_station();
   update_artist();
-  update_title();  
+  update_title();
+}
+
+void draw_playing(){
+  u8g.setFont(u8g_font_unifont);
   u8g.drawStr(station_x_pos, 12, station);
   u8g.drawStr(artist_x_pos, 26, artist);
   u8g.drawStr(title_x_pos, 40, title);
+  u8g.drawHLine(5, 47, 118); 
+  u8g.drawHLine(4, 48, 120); 
+  u8g.drawHLine(5, 49, 118); 
+  char dateTimetimeStr[17];
+  sprintf(dateTimetimeStr, "%02d:%02d% 02d-%02d-%d", 
+    dt.hour, dt.min, 
+    dt.day_of_month, dt.month, dt.year);
+  u8g.drawStr(0, 64, dateTimetimeStr);
+  
 }
 
 void setup() {
@@ -200,16 +182,22 @@ void setup() {
   strcpy(station, "Triple J");  
   strcpy(artist, "deadmau5");
   strcpy(title, "Ghosts 'n' Stuff (feat Rob Swire)");
+  
+  u8g.firstPage();  
+  do {
+    draw_idle();
+ } while( u8g.nextPage() );
+ 
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+  // put your main code here, to run repeatedly
+  update_radio_text();
   u8g.firstPage();  
   do {
    draw_playing();
   } while( u8g.nextPage() );
-  delay(200);
-
+  delay(20); 
 }
 
 void setTime(char * timeStr){
