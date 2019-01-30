@@ -11,6 +11,7 @@ enum text_dir { LEFT, RIGHT};
 int station_x_pos = 0;
 int artist_x_pos = 0;
 int title_x_pos = 0;
+unsigned int volume = 100;
 short station_dir = LEFT;
 short artist_dir = LEFT;
 short title_dir = LEFT;
@@ -126,7 +127,7 @@ void update_title(){
   else if (title_len == 16){
     title_x_pos = 0;
   } else {
-    Serial.println(title_x_pos);
+    //Serial.println(title_x_pos);
     title_x_pos -= 1;
     if(title_x_pos < -((title_len * 8))){
       title_x_pos = 0;
@@ -145,9 +146,12 @@ void draw_playing(){
   u8g.drawStr(station_x_pos, 12, station);
   u8g.drawStr(artist_x_pos, 26, artist);
   u8g.drawStr(title_x_pos, 40, title);
-  u8g.drawHLine(5, 47, 118); 
-  u8g.drawHLine(4, 48, 120); 
-  u8g.drawHLine(5, 49, 118); 
+  unsigned int vol_bar = 120 * (volume / 100.0);
+  u8g.drawHLine(5, 47, vol_bar - 1); 
+  u8g.drawHLine(4, 48, vol_bar); 
+  u8g.drawHLine(5, 49, vol_bar - 1);
+  //Serial.print("volume bar: ");
+  //Serial.println(vol_bar);
   char dateTimetimeStr[17];
   sprintf(dateTimetimeStr, "%02d:%02d% 02d-%02d-%d", 
     dt.hour, dt.min, 
@@ -252,6 +256,7 @@ void handleI2CString(char *i2c_str){
   char time_str[22];
   memcpy(cmd, i2c_str, 4);
   cmd[4] = '\0';
+  //Serial.println(i2c_str);
   if(strcmp(cmd, "clki") == 0){
     memcpy(time_str, i2c_str+5, 21);
     time_str[21] = '\0';
@@ -266,20 +271,30 @@ void handleI2CString(char *i2c_str){
     time_str[21] = '\0';
     //Serial.println(time_str);
     setTime(time_str);
+  } else if(strcmp(cmd, "volc") == 0){
+    //Serial.println("Volume change");
+    char vol_str[4];
+    memcpy(vol_str, i2c_str+5, 3);
+    vol_str[3] = '\0';
+    volume = atoi(vol_str);
+    //Serial.println(vol_str);
+    //unsigned int vol_bar = 120.0 * ((float)volume / 100.0);
+    //Serial.println(volume);
+    //Serial.println(vol_bar);
   }
 }
 
 void receiveEvent(int howMany) {
-  Serial.print("Receiving ");
-  Serial.println(howMany);
+  //Serial.print("Receiving ");
+  //Serial.println(howMany);
   char * i2c_str = (char *) malloc(sizeof(char) * howMany);
   int i = 0;
   while (1 < Wire.available()) { // loop through all but the last
     char c = Wire.read(); // receive byte as a character
     //Serial.print(c);         // print the character
-    Serial.print(i);
-    Serial.print(": ");
-    Serial.println(c);
+    //Serial.print(i);
+    //Serial.print(": ");
+    //Serial.println(c);
     if(c != '\0'){
       i2c_str[i] = c;
       i++;
@@ -288,6 +303,6 @@ void receiveEvent(int howMany) {
   i2c_str[i] = '\0';
   int x = Wire.read();    // receive byte as an integer
   //Serial.println(x);         // print the integer
-  Serial.println(i2c_str);
+  //Serial.println(i2c_str);
   handleI2CString(i2c_str);
 }
