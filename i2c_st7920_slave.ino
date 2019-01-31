@@ -1,5 +1,7 @@
 #include "U8glib.h"
 #include <Wire.h>
+#define CHA 2
+#define CHB 3
 U8GLIB_ST7920_128X64_4X u8g(13, 11, 10, 9);
 
 char days_of_week[7][4] = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
@@ -15,6 +17,9 @@ unsigned int volume = 100;
 short station_dir = LEFT;
 short artist_dir = LEFT;
 short title_dir = LEFT;
+
+volatile int master_count = 0;
+volatile byte INTFLAG1 = 0;
 
 typedef struct DATETIME {
     uint8_t day_of_week;
@@ -146,10 +151,24 @@ void draw_playing(){
   u8g.drawStr(station_x_pos, 12, station);
   u8g.drawStr(artist_x_pos, 26, artist);
   u8g.drawStr(title_x_pos, 40, title);
-  unsigned int vol_bar = 120 * (volume / 100.0);
-  u8g.drawHLine(5, 47, vol_bar - 1); 
+  if(master_count < 0){
+    master_count = 0;
+  }
+  else if(master_count > 100){
+    master_count = 100;
+  }
+  unsigned int vol_bar = 120 * (master_count / 100.0);
+  unsigned int tb_vol_bar;
+  tb_vol_bar = vol_bar-1;
+  if(vol_bar < 2){
+    tb_vol_bar = 0;
+  }
+  if(vol_bar > 118){
+    tb_vol_bar = 118;
+  }
+  u8g.drawHLine(5, 47, tb_vol_bar); 
   u8g.drawHLine(4, 48, vol_bar); 
-  u8g.drawHLine(5, 49, vol_bar - 1);
+  u8g.drawHLine(5, 49, tb_vol_bar);
   //Serial.print("volume bar: ");
   //Serial.println(vol_bar);
   char dateTimetimeStr[17];
@@ -174,10 +193,16 @@ void setup() {
   else if ( u8g.getMode() == U8G_MODE_HICOLOR ) {
     u8g.setHiColorByRGB(255,255,255);
   }
+  // interrupt code http://www.bristolwatch.com/arduino/arduino2.htm
+  pinMode(CHA, INPUT);
+  pinMode(CHB, INPUT);
 
   Wire.begin(8);                // join i2c bus with address #8
   Wire.onReceive(receiveEvent); // register event
+  Wire.onRequest(requestEvent);
   Serial.begin(9600);
+
+  attachInterrupt(0, flag, RISING);
 
   setTime("4-17-01-2019-19-44-33");
   station = (char *) malloc(sizeof(char) * 9);
@@ -194,6 +219,17 @@ void setup() {
  
 }
 
+void flag(){
+  INTFLAG1 = 1;
+  if (digitalRead(CHA) && !digitalRead(CHB)) {
+    master_count++ ;
+  }
+  // subtract 1 from count for CCW
+  if (digitalRead(CHA) && digitalRead(CHB)) {
+    master_count-- ;
+  } 
+}
+
 void loop() {
   // put your main code here, to run repeatedly
   update_radio_text();
@@ -202,6 +238,12 @@ void loop() {
    draw_playing();
   } while( u8g.nextPage() );
   delay(20); 
+  if(INTFLAG1){
+    
+    Serial.println(master_count);
+    //delay(50);
+    INTFLAG1 = 0;
+  }
 }
 
 void setTime(char * timeStr){
@@ -281,7 +323,22 @@ void handleI2CString(char *i2c_str){
     //unsigned int vol_bar = 120.0 * ((float)volume / 100.0);
     //Serial.println(volume);
     //Serial.println(vol_bar);
+  } else if(strcmp(cmd, "getv")){
+    //Serial.println("got get volume");
+    char vol_str[4];
+    sprintf(vol_str, "%02d", master_count);
+    Wire.write(vol_str);
   }
+}
+
+void requestEvent(){
+  Wire.write(1);
+  delay(30);
+  Wire.write(3);
+  delay(30);
+  Wire.write(3);
+  delay(30);
+  Wire.write(7);
 }
 
 void receiveEvent(int howMany) {
