@@ -2,6 +2,7 @@
 #include <Wire.h>
 #define CHA 2
 #define CHB 3
+#define CMD_GETVOL 0x01
 U8GLIB_ST7920_128X64_4X u8g(13, 11, 10, 9);
 
 char days_of_week[7][4] = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
@@ -9,6 +10,8 @@ char months_of_year[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "
 char * station;
 char * artist;
 char * title;
+char * i2c_str;
+int i2c_int;
 enum text_dir { LEFT, RIGHT};
 int station_x_pos = 0;
 int artist_x_pos = 0;
@@ -20,6 +23,9 @@ short title_dir = LEFT;
 
 volatile int master_count = 0;
 volatile byte INTFLAG1 = 0;
+volatile byte I2C_STR_FLAG = 0;
+volatile byte I2C_INT_FLAG = 0;
+volatile int i2c_cmd;
 
 typedef struct DATETIME {
     uint8_t day_of_week;
@@ -244,6 +250,15 @@ void loop() {
     //delay(50);
     INTFLAG1 = 0;
   }
+  if(I2C_STR_FLAG){
+    handleI2CString(i2c_str);
+    I2C_STR_FLAG = 0;
+  }
+  if(I2C_INT_FLAG){
+    handleI2CInt(i2c_int);
+    I2C_INT_FLAG = 0;
+    
+  }
 }
 
 void setTime(char * timeStr){
@@ -293,12 +308,18 @@ void setTime(char * timeStr){
   
 }
 
+void handleI2CInt(char i2c_int){
+  if(i2c_int == 1){
+    i2c_cmd = CMD_GETVOL;
+  }
+}
+
 void handleI2CString(char *i2c_str){
   char cmd[5];
   char time_str[22];
   memcpy(cmd, i2c_str, 4);
   cmd[4] = '\0';
-  //Serial.println(i2c_str);
+  Serial.println(i2c_str);
   if(strcmp(cmd, "clki") == 0){
     memcpy(time_str, i2c_str+5, 21);
     time_str[21] = '\0';
@@ -325,27 +346,33 @@ void handleI2CString(char *i2c_str){
     //Serial.println(vol_bar);
   } else if(strcmp(cmd, "getv")){
     //Serial.println("got get volume");
-    char vol_str[4];
-    sprintf(vol_str, "%02d", master_count);
-    Wire.write(vol_str);
+    //char vol_str[4];
+    //sprintf(vol_str, "%02d", master_count);
+    i2c_cmd = CMD_GETVOL;
   }
 }
 
 void requestEvent(){
-  Wire.write(1);
-  delay(30);
-  Wire.write(3);
-  delay(30);
-  Wire.write(3);
-  delay(30);
-  Wire.write(7);
+  if(i2c_cmd == CMD_GETVOL){
+    Serial.print("sending volume: ");
+    Serial.println(master_count);
+    Wire.write(master_count);
+    i2c_cmd = 0;
+  }
 }
 
 void receiveEvent(int howMany) {
   //Serial.print("Receiving ");
   //Serial.println(howMany);
-  char * i2c_str = (char *) malloc(sizeof(char) * howMany);
+  i2c_str = (char *) malloc(sizeof(char) * howMany);
   int i = 0;
+  if(howMany == 1){
+    while (1 < Wire.available()) { // loop through all but the last
+      i2c_int = Wire.read();
+    }
+    I2C_INT_FLAG = 1;
+  }
+  
   while (1 < Wire.available()) { // loop through all but the last
     char c = Wire.read(); // receive byte as a character
     //Serial.print(c);         // print the character
@@ -361,5 +388,5 @@ void receiveEvent(int howMany) {
   int x = Wire.read();    // receive byte as an integer
   //Serial.println(x);         // print the integer
   //Serial.println(i2c_str);
-  handleI2CString(i2c_str);
+  I2C_STR_FLAG = 1;
 }
