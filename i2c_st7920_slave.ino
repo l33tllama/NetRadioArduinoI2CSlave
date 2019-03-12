@@ -20,6 +20,7 @@ unsigned int volume = 100;
 short station_dir = LEFT;
 short artist_dir = LEFT;
 short title_dir = LEFT;
+bool vol_change = false;
 
 volatile int master_count = 0;
 volatile byte INTFLAG1 = 0;
@@ -38,6 +39,12 @@ typedef struct DATETIME {
 } Date_Time;
 
 Date_Time dt;
+
+enum Display_State {
+  STATE_IDLE, STATE_PLAYING
+};
+
+enum Display_State display_state;
 
 void hello_world(){
   u8g.setFont(u8g_font_unifont);
@@ -186,6 +193,10 @@ void draw_playing(){
 }
 
 void setup() {
+
+  display_state = STATE_IDLE;
+  master_count = 100;
+  
   // assign default color value
   if ( u8g.getMode() == U8G_MODE_R3G3B2 ) {
     u8g.setColorIndex(255);     // white
@@ -218,10 +229,10 @@ void setup() {
   strcpy(artist, "deadmau5");
   strcpy(title, "Ghosts 'n' Stuff (feat Rob Swire)");
   
-  u8g.firstPage();  
+  /*u8g.firstPage();  
   do {
     draw_idle();
- } while( u8g.nextPage() );
+ } while( u8g.nextPage() );*/
  
 }
 
@@ -239,9 +250,14 @@ void flag(){
 void loop() {
   // put your main code here, to run repeatedly
   update_radio_text();
+  
   u8g.firstPage();  
   do {
-   draw_playing();
+    if(display_state == STATE_IDLE){
+      draw_idle();
+    } else if (display_state == STATE_PLAYING){
+      draw_playing(); 
+    }    
   } while( u8g.nextPage() );
   delay(20); 
   if(INTFLAG1){
@@ -304,8 +320,7 @@ void setTime(char * timeStr){
   Serial.print("min ");
   Serial.println(dt.min);
   Serial.print("second ");
-  Serial.println(dt.second);
-  
+  Serial.println(dt.second);  
 }
 
 void handleI2CInt(char i2c_int){
@@ -319,27 +334,26 @@ void handleI2CString(char *i2c_str){
   char time_str[22];
   memcpy(cmd, i2c_str, 4);
   cmd[4] = '\0';
-  Serial.println(i2c_str);
+  //Serial.println(i2c_str);
   if(strcmp(cmd, "clki") == 0){
     memcpy(time_str, i2c_str+5, 21);
     time_str[21] = '\0';
-    //Serial.println(time_str);
+    Serial.println(time_str);
     setTime(time_str);
-    u8g.firstPage();  
-    do {
-      draw_idle();
-    } while( u8g.nextPage() );
+    display_state = STATE_IDLE;
   } else if(strcmp(cmd, "clkp") == 0){
     memcpy(time_str, i2c_str+5, 21);
     time_str[21] = '\0';
     //Serial.println(time_str);
     setTime(time_str);
+    display_state = STATE_PLAYING;
   } else if(strcmp(cmd, "volc") == 0){
     //Serial.println("Volume change");
     char vol_str[4];
     memcpy(vol_str, i2c_str+5, 3);
     vol_str[3] = '\0';
     volume = atoi(vol_str);
+    vol_change = true;
     //Serial.println(vol_str);
     //unsigned int vol_bar = 120.0 * ((float)volume / 100.0);
     //Serial.println(volume);
@@ -354,17 +368,16 @@ void handleI2CString(char *i2c_str){
 
 void requestEvent(){
   if(i2c_cmd == CMD_GETVOL){
-    Serial.print("sending volume: ");
-    Serial.println(master_count);
+    //Serial.print("sending volume: ");
+    //Serial.println(master_count);
     Wire.write(master_count);
     i2c_cmd = 0;
   }
 }
 
 void receiveEvent(int howMany) {
-  //Serial.print("Receiving ");
-  //Serial.println(howMany);
-  i2c_str = (char *) malloc(sizeof(char) * howMany);
+  Serial.print("Receiving ");
+  Serial.println(howMany);
   int i = 0;
   if(howMany == 1){
     while (1 < Wire.available()) { // loop through all but the last
@@ -374,6 +387,7 @@ void receiveEvent(int howMany) {
   }
   
   while (1 < Wire.available()) { // loop through all but the last
+    i2c_str = (char *) malloc(sizeof(char) * howMany);
     char c = Wire.read(); // receive byte as a character
     //Serial.print(c);         // print the character
     //Serial.print(i);
