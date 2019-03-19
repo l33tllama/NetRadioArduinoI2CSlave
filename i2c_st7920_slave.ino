@@ -5,13 +5,17 @@
 #define CMD_GETVOL 0x01
 U8GLIB_ST7920_128X64_4X u8g(13, 11, 10, 9);
 #define I2C_BUFFSIZE 128
+#define LCD_STR_MAX 33
 
 char days_of_week[7][4] = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
 char months_of_year[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "aug", "Sep", "Oct", "Nov", "Dec"};
-char * station;
-char * artist;
-char * title;
+char station[LCD_STR_MAX+1];
+char artist[LCD_STR_MAX+1];
+char title[LCD_STR_MAX+1];
 volatile char i2c_str[I2C_BUFFSIZE];
+char cmd[5];
+char time_str[22];
+char media_info[I2C_BUFFSIZE - 5];
 volatile int i2c_int;
 enum text_dir { LEFT, RIGHT};
 int station_x_pos = 0;
@@ -242,9 +246,9 @@ void setup() {
   attachInterrupt(0, flag, RISING);
 
   setTime("4-17-01-2019-19-44-33");
-  station = (char *) malloc(sizeof(char) * 9);
-  artist = (char *) malloc(sizeof(char) * 9);
-  title = (char *) malloc(sizeof(char) * 34);
+  //station = (char *) malloc(sizeof(char) * 9);
+  //artist = (char *) malloc(sizeof(char) * 9);
+  //title = (char *) malloc(sizeof(char) * 34);
   strcpy(station, "Triple J");  
   strcpy(artist, "deadmau5");
   strcpy(title, "Ghosts 'n' Stuff (feat Rob Swire)");
@@ -349,9 +353,7 @@ void handleI2CInt(char i2c_int){
   }
 }
 
-void handleI2CString(char *i2c_str){
-  char cmd[5];
-  char time_str[22];
+void handleI2CString(char *i2c_str){ 
   memcpy(cmd, i2c_str, 4);
   cmd[4] = '\0';
   Serial.println(i2c_str);
@@ -367,6 +369,15 @@ void handleI2CString(char *i2c_str){
     //Serial.println(time_str);
     setTime(time_str);
     display_state = STATE_PLAYING;
+  } else if(strcmp(cmd, "stat") == 0){
+    // TODO: update station  
+    strcpy(station, i2c_str+5);
+  } else if(strcmp(cmd, "arti") == 0){
+    // TODO: update artist
+    strcpy(artist, i2c_str+5);
+  } else if(strcmp(cmd, "titl") == 0){
+    // TODO: update title 
+    strcpy(title, i2c_str+5);
   } else if(strcmp(cmd, "volc") == 0){
     //Serial.println("Volume change");
     char vol_str[4];
@@ -388,8 +399,8 @@ void handleI2CString(char *i2c_str){
 
 void requestEvent(){
   if(i2c_cmd == CMD_GETVOL){
-    //Serial.print("sending volume: ");
-    //Serial.println(master_count);
+    Serial.print("sending volume: ");
+    Serial.println(master_count);
     Wire.write(master_count);
     i2c_cmd = 0;
   }
