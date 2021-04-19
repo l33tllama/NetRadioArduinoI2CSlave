@@ -12,6 +12,9 @@ char months_of_year[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "
 char station[LCD_STR_MAX+1];
 char artist[LCD_STR_MAX+1];
 char title[LCD_STR_MAX+1];
+char station_draw[LCD_STR_MAX+1];
+char title_draw[LCD_STR_MAX+1];
+char artist_draw[LCD_STR_MAX+1];
 volatile char i2c_str[I2C_BUFFSIZE];
 char cmd[5];
 char time_str[22];
@@ -21,7 +24,7 @@ enum text_dir { LEFT, RIGHT};
 int station_x_pos = 0;
 int artist_x_pos = 0;
 int title_x_pos = 0;
-unsigned int volume = 100;
+unsigned int volume = 50;
 short station_dir = LEFT;
 short artist_dir = LEFT;
 short title_dir = LEFT;
@@ -133,6 +136,10 @@ void draw_idle(){
 
 void update_station(){
   int station_len = strlen(station);
+  if(station_len == 0){
+    strcpy(station, "No station");
+    station_len = strlen(station);
+  }
   if(station_len < 16){
     station_x_pos = ((16-station_len) / 2) * 8;
   }
@@ -148,6 +155,10 @@ void update_station(){
 
 void update_artist(){
   int artist_len = strlen(artist);
+  if(artist_len == 0){
+    strcpy(artist, "No artist");
+    artist_len = strlen(artist);
+  }
   if(artist_len < 16){
     artist_x_pos = ((16-artist_len) / 2) * 8;
   }
@@ -163,6 +174,10 @@ void update_artist(){
 
 void update_title(){
   int title_len = strlen(title);
+  if(title_len == 0){
+    strcpy(title, "No title");
+    title_len = strlen(title);
+  }
   if(title_len < 16){
     title_x_pos = ((16-title_len) / 2) * 8;
   }
@@ -219,7 +234,7 @@ void draw_playing(){
 void setup() {
 
   display_state = STATE_IDLE;
-  master_count = 100;
+  master_count = volume;
   
   // assign default color value
   if ( u8g.getMode() == U8G_MODE_R3G3B2 ) {
